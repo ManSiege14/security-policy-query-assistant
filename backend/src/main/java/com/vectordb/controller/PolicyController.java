@@ -4,11 +4,14 @@ package com.vectordb.controller;
 import com.vectordb.model.dto.request.InsertDocumentRequest;
 import com.vectordb.model.dto.request.UploadPolicyRequest;
 import com.vectordb.model.dto.response.PolicyResponse;
+import com.vectordb.model.dto.request.PolicyAskRequest;
+import com.vectordb.model.dto.response.PolicyAskResponse;
 import com.vectordb.model.dto.response.PolicySearchResponse;
 import com.vectordb.model.dto.response.PolicySearchResult;
 import com.vectordb.service.DocumentService;
 import com.vectordb.service.OllamaService;
 import com.vectordb.service.PdfService;
+import com.vectordb.service.RagService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -33,6 +36,7 @@ public class PolicyController {
     private final PdfService pdfService;
     private final DocumentService documentService;
     private final OllamaService ollamaService;
+    private final RagService ragService;
 
     /**
      * POST /api/policies/upload
@@ -174,6 +178,36 @@ public class PolicyController {
      *   - 400: Missing query
      *   - 503: Ollama unavailable
      */
+    /**
+     * POST /api/policies/ask
+     *
+     * Answer a question using retrieved security policy chunks as the only authoritative context.
+     *
+     * Request body: { "question": "...", "topK": 5 (optional) }
+     * Response: { "question": "...", "answer": "..." }
+     */
+    @PostMapping("/ask")
+    public ResponseEntity<?> askPolicy(@RequestBody PolicyAskRequest request) {
+        if (request.getQuestion() == null || request.getQuestion().isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "question is required"));
+        }
+
+        try {
+            PolicyAskResponse response = ragService.askPolicy(
+                    request.getQuestion(),
+                    request.getTopK());
+
+            log.info("Policy RAG answered question ({} chars)", request.getQuestion().length());
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Policy ask failed: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Policy question answering failed"));
+        }
+    }
+
     @GetMapping("/search")
     public ResponseEntity<?> searchPolicies(
             @RequestParam(value = "q") String query,

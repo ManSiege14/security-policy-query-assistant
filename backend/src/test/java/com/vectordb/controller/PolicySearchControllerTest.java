@@ -4,6 +4,7 @@ import com.vectordb.model.dto.response.PolicySearchResponse;
 import com.vectordb.model.dto.response.PolicySearchResult;
 import com.vectordb.service.DocumentService;
 import com.vectordb.service.OllamaService;
+import com.vectordb.service.RagService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -31,10 +32,13 @@ class PolicySearchControllerTest {
     @Mock
     private DocumentService documentService;
 
+    @Mock
+    private RagService ragService;
+
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        policyController = new PolicyController(null, documentService, ollamaService);
+        policyController = new PolicyController(null, documentService, ollamaService, ragService);
     }
 
     /**

@@ -2,7 +2,9 @@ package com.vectordb.controller;
 
 import com.vectordb.model.dto.response.PolicyResponse;
 import com.vectordb.service.DocumentService;
+import com.vectordb.service.OllamaService;
 import com.vectordb.service.PdfService;
+import com.vectordb.service.RagService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,6 +30,12 @@ class PolicyControllerTest {
 
     @Mock
     private DocumentService documentService;
+
+    @Mock
+    private OllamaService ollamaService;
+
+    @Mock
+    private RagService ragService;
 
     @Mock
     private MultipartFile mockFile;
