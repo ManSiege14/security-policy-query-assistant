@@ -339,4 +339,102 @@ public class DocumentService {
 
         return new ArrayList<>(policies.values());
     }
+
+    /**
+     * Searches for policy documents with similarity scores.
+     * Results are sorted by similarity (highest first).
+     * Optionally filters by policyName and/or policyType.
+     *
+     * @param embedding Query embedding vector
+     * @param metric    Distance metric ("cosine", "euclidean", "manhattan")
+     * @param k         Maximum number of results to return
+     * @param policyName Optional filter (null = no filter)
+     * @param policyType Optional filter (null = no filter)
+     * @return List of policy search results sorted by similarity (descending)
+     */
+    public List<com.vectordb.model.dto.response.PolicySearchResult> searchPolicies(
+            List<Double> embedding,
+            String metric,
+            int k,
+            String policyName,
+            String policyType) {
+
+        // Step 1: Get all vector store results sorted by distance
+        List<com.vectordb.model.VectorItem> vectorResults = docStore.search(embedding, Math.max(k, 100), metric);
+
+        // Step 2: Convert to array for distance calculations
+        double[] queryArr = com.vectordb.core.VectorMath.toArray(embedding);
+
+        // Step 3: Build PolicySearchResult objects with similarity scores and metadata
+        List<com.vectordb.model.dto.response.PolicySearchResult> results = new ArrayList<>();
+
+        for (com.vectordb.model.VectorItem vectorItem : vectorResults) {
+            // Get the DocItem metadata for this vector
+            DocItem docItem = metadataStore.get(vectorItem.getId());
+            if (docItem == null) {
+                continue;
+            }
+
+            // Only include results with policy metadata
+            if (docItem.getPolicyName() == null || docItem.getPolicyType() == null) {
+                continue;
+            }
+
+            // Apply optional policyName filter
+            if (policyName != null && !policyName.isBlank() 
+                    && !docItem.getPolicyName().equalsIgnoreCase(policyName)) {
+                continue;
+            }
+
+            // Apply optional policyType filter
+            if (policyType != null && !policyType.isBlank() 
+                    && !docItem.getPolicyType().equalsIgnoreCase(policyType)) {
+                continue;
+            }
+
+            // Calculate similarity: convert distance to similarity (0-1, higher = more relevant)
+            double distance = com.vectordb.core.VectorMath.distance(
+                    queryArr,
+                    com.vectordb.core.VectorMath.toArray(vectorItem.getEmbedding()),
+                    metric
+            );
+            // For cosine distance, similarity = 1 - distance; clamp for user-facing [0, 1] (float noise)
+            double similarity = Math.max(0.0, Math.min(1.0, 1.0 - distance));
+
+            // Build result with policy metadata and similarity
+            com.vectordb.model.dto.response.PolicySearchResult result =
+                    com.vectordb.model.dto.response.PolicySearchResult.builder()
+                            .documentId(docItem.getDocumentId())
+                            .policyName(docItem.getPolicyName())
+                            .policyType(docItem.getPolicyType())
+                            .sectionNumber(docItem.getSectionNumber())
+                            .sectionTitle(docItem.getSectionTitle())
+                            .chunkIndex(docItem.getChunkIndex())
+                            .chunkText(docItem.getChunkText())
+                            .similarity(similarity)
+                            .build();
+
+            results.add(result);
+
+            // Stop after k results
+            if (results.size() >= k) {
+                break;
+            }
+        }
+
+        // Results are already sorted by similarity because docStore.search() sorts by distance
+        // (and we break after k results, preserving the order)
+        return results;
+    }
+
+    /**
+     * Searches for policy documents without filters.
+     * Convenience method that calls searchPolicies with null filters.
+     */
+    public List<com.vectordb.model.dto.response.PolicySearchResult> searchPolicies(
+            List<Double> embedding,
+            String metric,
+            int k) {
+        return searchPolicies(embedding, metric, k, null, null);
+    }
 }

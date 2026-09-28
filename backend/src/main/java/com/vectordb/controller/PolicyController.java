@@ -4,7 +4,10 @@ package com.vectordb.controller;
 import com.vectordb.model.dto.request.InsertDocumentRequest;
 import com.vectordb.model.dto.request.UploadPolicyRequest;
 import com.vectordb.model.dto.response.PolicyResponse;
+import com.vectordb.model.dto.response.PolicySearchResponse;
+import com.vectordb.model.dto.response.PolicySearchResult;
 import com.vectordb.service.DocumentService;
+import com.vectordb.service.OllamaService;
 import com.vectordb.service.PdfService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -28,6 +32,7 @@ public class PolicyController {
 
     private final PdfService pdfService;
     private final DocumentService documentService;
+    private final OllamaService ollamaService;
 
     /**
      * POST /api/policies/upload
@@ -147,6 +152,77 @@ public class PolicyController {
             log.error("Failed to list policies: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", "Failed to list policies"));
+        }
+    }
+
+    /**
+     * GET /api/policies/search
+     * 
+     * Search security policies by semantic similarity.
+     * Returns policy chunks with metadata and similarity scores.
+     * Optionally filters by policyName and/or policyType.
+     * 
+     * Query Parameters:
+     *   - q: Search query (required)
+     *   - topK: Maximum results to return (default: 5)
+     *   - policyName: Filter by policy name (optional)
+     *   - policyType: Filter by policy type (optional)
+     *
+     * Response: { query, results: [{ documentId, policyName, policyType, sectionNumber, sectionTitle, chunkIndex, chunkText, similarity }], count }
+     * 
+     * Errors:
+     *   - 400: Missing query
+     *   - 503: Ollama unavailable
+     */
+    @GetMapping("/search")
+    public ResponseEntity<?> searchPolicies(
+            @RequestParam(value = "q") String query,
+            @RequestParam(value = "topK", defaultValue = "5") int topK,
+            @RequestParam(value = "policyName", required = false) String policyName,
+            @RequestParam(value = "policyType", required = false) String policyType) {
+
+        try {
+            // Validate query
+            if (query == null || query.isBlank()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "query parameter 'q' is required"));
+            }
+
+            // Embed the query
+            double[] raw = ollamaService.embed(query);
+            if (raw.length == 0) {
+                return ResponseEntity.status(503)
+                        .body(Map.of("error", "Ollama unavailable. Install from https://ollama.com " +
+                                "then run: ollama pull nomic-embed-text"));
+            }
+
+            // Convert to List<Double>
+            List<Double> embedding = new ArrayList<>();
+            for (double v : raw) {
+                embedding.add(v);
+            }
+
+            // Search for policy documents with optional filtering
+            List<PolicySearchResult> results = documentService.searchPolicies(
+                    embedding,
+                    "cosine",  // Default metric
+                    topK,
+                    policyName,
+                    policyType
+            );
+
+            log.info("Policy search for '{}' returned {} result(s)", query, results.size());
+
+            return ResponseEntity.ok(PolicySearchResponse.builder()
+                    .query(query)
+                    .results(results)
+                    .count(results.size())
+                    .build());
+
+        } catch (Exception e) {
+            log.error("Policy search failed: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Policy search failed: " + e.getMessage()));
         }
     }
 
