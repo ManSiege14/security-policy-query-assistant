@@ -184,7 +184,7 @@ public class PolicyController {
      * Answer a question using retrieved security policy chunks as the only authoritative context.
      *
      * Request body: { "question": "...", "topK": 5 (optional) }
-     * Response: { "question": "...", "answer": "..." }
+     * Response: { "question": "...", "answer": "...", "sources": [...] }
      */
     @PostMapping("/ask")
     public ResponseEntity<?> askPolicy(@RequestBody PolicyAskRequest request) {

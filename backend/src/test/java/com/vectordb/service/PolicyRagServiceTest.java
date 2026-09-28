@@ -64,6 +64,10 @@ class PolicyRagServiceTest {
 
         assertEquals("What are the password requirements?", response.getQuestion());
         assertEquals("Passwords must be changed every 90 days.", response.getAnswer());
+        assertNotNull(response.getSources());
+        assertEquals(1, response.getSources().size());
+        assertEquals("Password Security Policy", response.getSources().get(0).getPolicyName());
+        assertEquals(0.92, response.getSources().get(0).getSimilarity());
 
         ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
         verify(ollamaService).generate(promptCaptor.capture());
@@ -155,6 +159,8 @@ class PolicyRagServiceTest {
 
         verify(ollamaService, never()).generate(anyString());
         assertEquals(RagService.NO_POLICY_CONTEXT_ANSWER, response.getAnswer());
+        assertNotNull(response.getSources());
+        assertTrue(response.getSources().isEmpty());
     }
 
     @Test

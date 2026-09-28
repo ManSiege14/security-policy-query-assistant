@@ -5,6 +5,7 @@ import com.vectordb.model.VectorItem;
 import com.vectordb.model.dto.request.RagRequest;
 import com.vectordb.model.dto.response.PolicyAskResponse;
 import com.vectordb.model.dto.response.PolicySearchResult;
+import com.vectordb.model.dto.response.PolicySourceResponse;
 import com.vectordb.model.dto.response.RagResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -87,6 +88,7 @@ public class RagService {
             return PolicyAskResponse.builder()
                     .question(question)
                     .answer("Embedding service unavailable. Please check Ollama.")
+                    .sources(List.of())
                     .build();
         }
 
@@ -104,8 +106,11 @@ public class RagService {
             return PolicyAskResponse.builder()
                     .question(question)
                     .answer(NO_POLICY_CONTEXT_ANSWER)
+                    .sources(List.of())
                     .build();
         }
+
+        List<PolicySourceResponse> sources = toPolicySources(policyChunks);
 
         String prompt = buildPolicyPrompt(question, policyChunks);
         log.debug("Policy RAG prompt:\n{}", prompt);
@@ -115,7 +120,23 @@ public class RagService {
         return PolicyAskResponse.builder()
                 .question(question)
                 .answer(answer)
+                .sources(sources)
                 .build();
+    }
+
+    private List<PolicySourceResponse> toPolicySources(List<PolicySearchResult> policyChunks) {
+        List<PolicySourceResponse> sources = new ArrayList<>(policyChunks.size());
+        for (PolicySearchResult chunk : policyChunks) {
+            sources.add(PolicySourceResponse.builder()
+                    .policyName(chunk.getPolicyName())
+                    .policyType(chunk.getPolicyType())
+                    .sectionNumber(chunk.getSectionNumber())
+                    .sectionTitle(chunk.getSectionTitle())
+                    .chunkIndex(chunk.getChunkIndex())
+                    .similarity(chunk.getSimilarity())
+                    .build());
+        }
+        return sources;
     }
 
     private String buildPrompt(String question, List<DocItem> context) {
