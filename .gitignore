@@ -1,0 +1,27 @@
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+
+# Node
+**/node_modules/
+
+# Java
+**/target/
+
+# Logs
+*.log
+
+# Crash reports
+hs_err_pid*
+replay_pid*
